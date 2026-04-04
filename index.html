@@ -1,27 +1,330 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <title>My First App</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>币安 U本位合约数据面板</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+      margin: 0;
+      background: #0f172a;
+      color: #e2e8f0;
+    }
+    .wrap {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+    h1 {
+      margin: 0 0 16px;
+      font-size: 28px;
+    }
+    .desc {
+      color: #94a3b8;
+      margin-bottom: 20px;
+    }
+    .toolbar {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+    input, select, button {
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid #334155;
+      background: #111827;
+      color: #e5e7eb;
+      font-size: 14px;
+    }
+    button {
+      cursor: pointer;
+      background: #2563eb;
+      border: none;
+    }
+    button:hover {
+      background: #1d4ed8;
+    }
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px;
+      margin: 16px 0 24px;
+    }
+    .card {
+      background: #111827;
+      border: 1px solid #1f2937;
+      border-radius: 16px;
+      padding: 16px;
+    }
+    .card .label {
+      color: #94a3b8;
+      font-size: 13px;
+      margin-bottom: 8px;
+    }
+    .card .value {
+      font-size: 24px;
+      font-weight: 700;
+    }
+    .table-box {
+      overflow: auto;
+      background: #111827;
+      border: 1px solid #1f2937;
+      border-radius: 16px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 1200px;
+    }
+    th, td {
+      padding: 12px 10px;
+      border-bottom: 1px solid #1f2937;
+      text-align: left;
+      font-size: 14px;
+    }
+    th {
+      position: sticky;
+      top: 0;
+      background: #0b1220;
+      color: #cbd5e1;
+      cursor: pointer;
+    }
+    tr:hover td {
+      background: #0b1220;
+    }
+    .up { color: #22c55e; }
+    .down { color: #ef4444; }
+    .muted { color: #94a3b8; }
+    .status {
+      margin: 10px 0 18px;
+      color: #93c5fd;
+      font-size: 14px;
+    }
+    .footer {
+      margin-top: 16px;
+      color: #64748b;
+      font-size: 12px;
+    }
+  </style>
 </head>
 <body>
-    <h1>欢迎使用我的第一个程序 🎉</h1>
+  <div class="wrap">
+    <h1>币安 U本位合约数据面板</h1>
+    <div class="desc">
+      先做第一步：查看全市场合约基础信息、24h 涨跌、成交额、标记价格、资金费率。
+    </div>
 
-    <input type="text" id="nameInput" placeholder="输入你的名字">
-    <button onclick="sayHello()">点击打招呼</button>
+    <div class="toolbar">
+      <input id="searchInput" type="text" placeholder="搜索交易对，如 BTCUSDT / ETH" />
+      <select id="statusFilter">
+        <option value="">全部状态</option>
+        <option value="TRADING">仅 TRADING</option>
+      </select>
+      <select id="sortField">
+        <option value="quoteVolume">按成交额排序</option>
+        <option value="priceChangePercent">按涨跌幅排序</option>
+        <option value="lastPrice">按最新价排序</option>
+        <option value="fundingRate">按资金费率排序</option>
+      </select>
+      <select id="sortOrder">
+        <option value="desc">降序</option>
+        <option value="asc">升序</option>
+      </select>
+      <button id="refreshBtn">刷新数据</button>
+    </div>
 
-    <p id="result"></p>
+    <div id="status" class="status">准备加载...</div>
 
-    <script>
-        function sayHello() {
-            var name = document.getElementById("nameInput").value;
+    <div class="cards">
+      <div class="card">
+        <div class="label">合约总数</div>
+        <div id="totalSymbols" class="value">-</div>
+      </div>
+      <div class="card">
+        <div class="label">交易中合约</div>
+        <div id="tradingSymbols" class="value">-</div>
+      </div>
+      <div class="card">
+        <div class="label">USDT 保证金合约</div>
+        <div id="usdtSymbols" class="value">-</div>
+      </div>
+      <div class="card">
+        <div class="label">最后刷新时间</div>
+        <div id="lastUpdate" class="value" style="font-size:18px;">-</div>
+      </div>
+    </div>
 
-            if (name === "") {
-                document.getElementById("result").innerText = "请输入名字哦 😄";
-            } else {
-                document.getElementById("result").innerText = "Hello, " + name + " 👋";
-            }
-        }
-    </script>
+    <div class="table-box">
+      <table>
+        <thead>
+          <tr>
+            <th>交易对</th>
+            <th>状态</th>
+            <th>合约类型</th>
+            <th>基础币</th>
+            <th>计价币</th>
+            <th>最新价</th>
+            <th>24h涨跌%</th>
+            <th>24h成交量</th>
+            <th>24h成交额</th>
+            <th>标记价格</th>
+            <th>资金费率</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+
+    <div class="footer">
+      数据来源：Binance USDⓈ-M Futures 公开接口。
+    </div>
+  </div>
+
+  <script>
+    const API_BASE = "https://fapi.binance.com";
+
+    let allRows = [];
+
+    async function fetchJson(url) {
+      const res = await fetch(url);
+      if (!res.ok) {
+        throw new Error(`请求失败: ${res.status} ${res.statusText}`);
+      }
+      return await res.json();
+    }
+
+    function toNum(v) {
+      const n = Number(v);
+      return Number.isFinite(n) ? n : 0;
+    }
+
+    function formatNum(v, digits = 4) {
+      const n = toNum(v);
+      if (Math.abs(n) >= 1_000_000_000) return (n / 1_000_000_000).toFixed(2) + "B";
+      if (Math.abs(n) >= 1_000_000) return (n / 1_000_000).toFixed(2) + "M";
+      if (Math.abs(n) >= 1_000) return (n / 1_000).toFixed(2) + "K";
+      return n.toFixed(digits);
+    }
+
+    function formatRate(v) {
+      const n = toNum(v);
+      const cls = n >= 0 ? "up" : "down";
+      return `<span class="${cls}">${n.toFixed(4)}%</span>`;
+    }
+
+    function formatFunding(v) {
+      const n = toNum(v) * 100;
+      const cls = n >= 0 ? "up" : "down";
+      return `<span class="${cls}">${n.toFixed(4)}%</span>`;
+    }
+
+    function updateStats(symbols) {
+      document.getElementById("totalSymbols").textContent = symbols.length;
+      document.getElementById("tradingSymbols").textContent = symbols.filter(x => x.status === "TRADING").length;
+      document.getElementById("usdtSymbols").textContent = symbols.filter(x => x.marginAsset === "USDT").length;
+      document.getElementById("lastUpdate").textContent = new Date().toLocaleString();
+    }
+
+    function buildMergedRows(exchangeInfo, tickers24h, premiumIndex) {
+      const tickerMap = new Map(tickers24h.map(x => [x.symbol, x]));
+      const premiumMap = new Map(premiumIndex.map(x => [x.symbol, x]));
+
+      return exchangeInfo.symbols.map(symbol => {
+        const t = tickerMap.get(symbol.symbol) || {};
+        const p = premiumMap.get(symbol.symbol) || {};
+        return {
+          symbol: symbol.symbol,
+          status: symbol.status,
+          contractType: symbol.contractType,
+          baseAsset: symbol.baseAsset,
+          quoteAsset: symbol.quoteAsset,
+          marginAsset: symbol.marginAsset,
+          lastPrice: toNum(t.lastPrice),
+          priceChangePercent: toNum(t.priceChangePercent),
+          volume: toNum(t.volume),
+          quoteVolume: toNum(t.quoteVolume),
+          markPrice: toNum(p.markPrice),
+          fundingRate: toNum(p.lastFundingRate)
+        };
+      });
+    }
+
+    function renderTable() {
+      const keyword = document.getElementById("searchInput").value.trim().toUpperCase();
+      const statusFilter = document.getElementById("statusFilter").value;
+      const sortField = document.getElementById("sortField").value;
+      const sortOrder = document.getElementById("sortOrder").value;
+
+      let rows = [...allRows];
+
+      if (keyword) {
+        rows = rows.filter(row =>
+          row.symbol.includes(keyword) ||
+          row.baseAsset.includes(keyword) ||
+          row.quoteAsset.includes(keyword)
+        );
+      }
+
+      if (statusFilter) {
+        rows = rows.filter(row => row.status === statusFilter);
+      }
+
+      rows.sort((a, b) => {
+        const av = toNum(a[sortField]);
+        const bv = toNum(b[sortField]);
+        return sortOrder === "asc" ? av - bv : bv - av;
+      });
+
+      const tbody = document.getElementById("tableBody");
+      tbody.innerHTML = rows.map(row => `
+        <tr>
+          <td><strong>${row.symbol}</strong></td>
+          <td>${row.status}</td>
+          <td>${row.contractType}</td>
+          <td>${row.baseAsset}</td>
+          <td>${row.quoteAsset}</td>
+          <td>${formatNum(row.lastPrice, 6)}</td>
+          <td>${formatRate(row.priceChangePercent)}</td>
+          <td>${formatNum(row.volume, 2)}</td>
+          <td>${formatNum(row.quoteVolume, 2)}</td>
+          <td>${formatNum(row.markPrice, 6)}</td>
+          <td>${formatFunding(row.fundingRate)}</td>
+        </tr>
+      `).join("");
+
+      document.getElementById("status").textContent = `已加载 ${rows.length} 条合约数据`;
+    }
+
+    async function loadData() {
+      const statusEl = document.getElementById("status");
+      statusEl.textContent = "正在加载币安 U本位合约数据...";
+
+      try {
+        const [exchangeInfo, tickers24h, premiumIndex] = await Promise.all([
+          fetchJson(`${API_BASE}/fapi/v1/exchangeInfo`),
+          fetchJson(`${API_BASE}/fapi/v1/ticker/24hr`),
+          fetchJson(`${API_BASE}/fapi/v1/premiumIndex`)
+        ]);
+
+        allRows = buildMergedRows(exchangeInfo, tickers24h, premiumIndex);
+        updateStats(exchangeInfo.symbols);
+        renderTable();
+        statusEl.textContent = `加载成功，共 ${allRows.length} 条`;
+      } catch (err) {
+        console.error(err);
+        statusEl.textContent = `加载失败：${err.message}`;
+      }
+    }
+
+    document.getElementById("refreshBtn").addEventListener("click", loadData);
+    document.getElementById("searchInput").addEventListener("input", renderTable);
+    document.getElementById("statusFilter").addEventListener("change", renderTable);
+    document.getElementById("sortField").addEventListener("change", renderTable);
+    document.getElementById("sortOrder").addEventListener("change", renderTable);
+
+    loadData();
+  </script>
 </body>
 </html>
