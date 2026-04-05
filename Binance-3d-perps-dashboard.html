@@ -1,0 +1,1041 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Binance 永续合约 3D 监控面板 Pro</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      --bg: #050b16;
+      --panel: rgba(10, 17, 31, 0.72);
+      --panel-2: rgba(15, 23, 42, 0.78);
+      --line: rgba(148, 163, 184, 0.16);
+      --text: #ebf2ff;
+      --muted: #94a3b8;
+      --cyan: #22d3ee;
+      --blue: #38bdf8;
+      --green: #22c55e;
+      --amber: #f59e0b;
+      --red: #ef4444;
+      --violet: #8b5cf6;
+      --shadow: 0 24px 80px rgba(0, 0, 0, 0.42);
+    }
+
+    * { box-sizing: border-box; }
+    html, body { min-height: 100%; }
+    body {
+      margin: 0;
+      color: var(--text);
+      font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+      background:
+        radial-gradient(circle at 15% 15%, rgba(34, 211, 238, 0.14), transparent 24%),
+        radial-gradient(circle at 82% 12%, rgba(139, 92, 246, 0.16), transparent 28%),
+        radial-gradient(circle at 55% 82%, rgba(34, 197, 94, 0.08), transparent 30%),
+        linear-gradient(180deg, #040912 0%, #06101c 35%, #08111f 100%);
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+      background-size: 36px 36px;
+      mask-image: linear-gradient(to bottom, rgba(0,0,0,.9), transparent 78%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .orb {
+      position: fixed;
+      border-radius: 999px;
+      filter: blur(18px);
+      pointer-events: none;
+      opacity: .45;
+      z-index: 0;
+      animation: floatOrb 12s ease-in-out infinite;
+    }
+    .orb.one {
+      width: 180px; height: 180px; left: 3%; top: 12%;
+      background: radial-gradient(circle, rgba(34,211,238,.45), rgba(34,211,238,0));
+    }
+    .orb.two {
+      width: 220px; height: 220px; right: 4%; top: 8%;
+      background: radial-gradient(circle, rgba(139,92,246,.42), rgba(139,92,246,0));
+      animation-delay: -4s;
+    }
+    .orb.three {
+      width: 200px; height: 200px; right: 18%; bottom: 8%;
+      background: radial-gradient(circle, rgba(34,197,94,.25), rgba(34,197,94,0));
+      animation-delay: -8s;
+    }
+
+    @keyframes floatOrb {
+      0%,100% { transform: translate3d(0,0,0) scale(1); }
+      50% { transform: translate3d(0,-22px,0) scale(1.05); }
+    }
+
+    .wrap {
+      max-width: 1460px;
+      margin: 0 auto;
+      padding: 28px 22px 80px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .glass {
+      position: relative;
+      background: linear-gradient(180deg, rgba(15, 23, 42, 0.78), rgba(8, 15, 28, 0.78));
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 24px;
+      backdrop-filter: blur(18px);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      transform-style: preserve-3d;
+      transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+    }
+
+    .glass::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(255,255,255,.10), transparent 26%, transparent 72%, rgba(255,255,255,.04));
+      pointer-events: none;
+    }
+
+    .glass:hover {
+      border-color: rgba(56, 189, 248, 0.18);
+      box-shadow: 0 28px 90px rgba(0, 0, 0, 0.5);
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: 1.2fr .8fr;
+      gap: 18px;
+      perspective: 1400px;
+      margin-bottom: 20px;
+    }
+
+    .hero-main, .hero-side { padding: 24px; }
+    .hero-main { min-height: 290px; }
+
+    .kicker {
+      font-size: 12px;
+      letter-spacing: .18em;
+      text-transform: uppercase;
+      color: #7dd3fc;
+      margin-bottom: 10px;
+    }
+
+    h1 {
+      margin: 0 0 10px;
+      font-size: 36px;
+      line-height: 1.08;
+    }
+
+    .sub {
+      color: var(--muted);
+      line-height: 1.7;
+      margin-bottom: 16px;
+      max-width: 780px;
+    }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 14px;
+      align-items: center;
+    }
+
+    select, button {
+      appearance: none;
+      border: 1px solid rgba(255,255,255,0.10);
+      background: rgba(15, 23, 42, 0.9);
+      color: var(--text);
+      border-radius: 14px;
+      padding: 12px 14px;
+      font-size: 14px;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.05), 0 12px 24px rgba(0,0,0,.18);
+    }
+
+    button {
+      cursor: pointer;
+      border: none;
+      font-weight: 700;
+      background: linear-gradient(135deg, #2563eb, #22d3ee);
+    }
+
+    .status {
+      min-height: 22px;
+      margin-top: 14px;
+      color: #93c5fd;
+      font-size: 14px;
+    }
+
+    .hero-side h2 {
+      margin: 0 0 10px;
+      font-size: 24px;
+    }
+
+    .legend {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 12px;
+    }
+
+    .legend-item {
+      padding: 14px;
+      border-radius: 18px;
+      background: rgba(2, 6, 23, 0.34);
+      border: 1px solid rgba(255,255,255,0.05);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.04);
+    }
+
+    .legend-item .name {
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    .legend-item .desc {
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 16px;
+      margin: 22px 0;
+      perspective: 1400px;
+    }
+
+    .card {
+      padding: 18px;
+      min-height: 132px;
+    }
+
+    .card-label {
+      color: var(--muted);
+      font-size: 13px;
+      margin-bottom: 10px;
+    }
+
+    .card-value {
+      font-size: 28px;
+      font-weight: 800;
+      line-height: 1.1;
+      margin-bottom: 8px;
+    }
+
+    .card-note {
+      font-size: 12px;
+      color: #a7b5ce;
+      line-height: 1.5;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1.14fr .86fr;
+      gap: 18px;
+      margin-bottom: 18px;
+    }
+
+    .panel { padding: 18px; }
+    .panel h2 { margin: 0 0 6px; font-size: 18px; }
+    .caption {
+      margin: 0 0 14px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    .canvas-box {
+      position: relative;
+      width: 100%;
+      height: 520px;
+      border-radius: 18px;
+      overflow: hidden;
+      background: linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,0));
+    }
+
+    .canvas-box.short { height: 420px; }
+
+    .signal-list {
+      display: grid;
+      gap: 12px;
+      max-height: 520px;
+      overflow: auto;
+      padding-right: 4px;
+    }
+
+    .signal-list::-webkit-scrollbar { width: 8px; }
+    .signal-list::-webkit-scrollbar-thumb {
+      background: rgba(148,163,184,.25);
+      border-radius: 999px;
+    }
+
+    .signal-item {
+      padding: 16px;
+      border-radius: 18px;
+      background: rgba(2, 6, 23, 0.36);
+      border: 1px solid rgba(255,255,255,0.06);
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      gap: 12px;
+      align-items: center;
+      transform: translateZ(10px);
+      transition: transform .18s ease, border-color .18s ease;
+    }
+
+    .signal-item:hover {
+      transform: translateY(-2px) translateZ(16px);
+      border-color: rgba(56, 189, 248, 0.18);
+    }
+
+    .signal-badge {
+      width: 12px;
+      height: 48px;
+      border-radius: 999px;
+      box-shadow: 0 0 18px currentColor;
+    }
+
+    .signal-title {
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .signal-meta {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    .signal-tag {
+      padding: 8px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      background: rgba(255,255,255,.08);
+      white-space: nowrap;
+    }
+
+    .kline-panel {
+      padding: 18px;
+    }
+
+    .kline-toolbar {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 14px;
+      align-items: center;
+    }
+
+    .chip {
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 999px;
+      padding: 8px 12px;
+      font-size: 12px;
+      color: #d3dff6;
+      background: rgba(255,255,255,.04);
+    }
+
+    .chip strong { color: #fff; }
+
+    .footer {
+      margin-top: 16px;
+      color: #7f90af;
+      font-size: 12px;
+      line-height: 1.7;
+    }
+
+    @media (max-width: 1180px) {
+      .hero, .grid { grid-template-columns: 1fr; }
+      .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+
+    @media (max-width: 720px) {
+      .cards, .legend { grid-template-columns: 1fr; }
+      .canvas-box { height: 420px; }
+      .canvas-box.short { height: 340px; }
+      h1 { font-size: 30px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="orb one"></div>
+  <div class="orb two"></div>
+  <div class="orb three"></div>
+
+  <div class="wrap">
+    <section class="hero">
+      <div class="glass hero-main tilt-card">
+        <div class="kicker">Binance Futures · Perpetual Radar Pro</div>
+        <h1>U本位永续合约 3D 立体异动看板</h1>
+        <div class="sub">
+          只筛选 <strong>USDT</strong>、<strong>PERPETUAL</strong>、<strong>TRADING</strong> 合约，按 24h 成交额取前 N，联动分析 <strong>成交额</strong>、<strong>涨跌幅</strong>、<strong>资金费率</strong>、<strong>未平仓量</strong>。点击图表中的任意币种，可在下方查看 4h K 线走势。
+        </div>
+        <div class="toolbar">
+          <select id="topN">
+            <option value="10">Top 10</option>
+            <option value="20">Top 20</option>
+            <option value="30" selected>Top 30</option>
+          </select>
+          <select id="refreshInterval">
+            <option value="0">手动刷新</option>
+            <option value="15000">15 秒</option>
+            <option value="30000" selected>30 秒</option>
+            <option value="60000">60 秒</option>
+          </select>
+          <button id="refreshBtn">立即刷新</button>
+        </div>
+        <div id="status" class="status">准备加载...</div>
+      </div>
+
+      <div class="glass hero-side tilt-card">
+        <div class="kicker">Signal Rules</div>
+        <h2>信号逻辑</h2>
+        <div class="legend">
+          <div class="legend-item">
+            <div class="name">强趋势</div>
+            <div class="desc">上涨且 OI 抬升，更可能是新增资金顺势加仓。</div>
+          </div>
+          <div class="legend-item">
+            <div class="name">过热预警</div>
+            <div class="desc">涨幅大且资金费偏高，容易出现多头拥挤。</div>
+          </div>
+          <div class="legend-item">
+            <div class="name">逼仓波动</div>
+            <div class="desc">波动很大但 OI 偏弱，可能是平仓驱动的脉冲行情。</div>
+          </div>
+          <div class="legend-item">
+            <div class="name">流动性优先</div>
+            <div class="desc">只跟踪成交额靠前合约，减少低流动性噪声。</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="cards">
+      <div class="glass card tilt-card">
+        <div class="card-label">USDT 永续合约总数</div>
+        <div id="totalSymbols" class="card-value">-</div>
+        <div class="card-note">仅统计 quoteAsset=USDT 且 contractType=PERPETUAL</div>
+      </div>
+      <div class="glass card tilt-card">
+        <div class="card-label">纳入分析数量</div>
+        <div id="visualCount" class="card-value">-</div>
+        <div class="card-note">按 24h quoteVolume 排名前 N</div>
+      </div>
+      <div class="glass card tilt-card">
+        <div class="card-label">成交额第一名</div>
+        <div id="topSymbol" class="card-value">-</div>
+        <div id="topSymbolNote" class="card-note">-</div>
+      </div>
+      <div class="glass card tilt-card">
+        <div class="card-label">最热过热标的</div>
+        <div id="overheatSymbol" class="card-value">-</div>
+        <div id="overheatNote" class="card-note">-</div>
+      </div>
+      <div class="glass card tilt-card">
+        <div class="card-label">当前选中标的</div>
+        <div id="focusSymbol" class="card-value">-</div>
+        <div id="focusNote" class="card-note">点击图表中的点或柱子切换</div>
+      </div>
+    </section>
+
+    <section class="grid">
+      <div class="glass panel tilt-card">
+        <h2>3D 成交额柱状图</h2>
+        <p class="caption">用斜切顶部和阴影模拟立体柱体。点击柱体可切换下方 K 线。</p>
+        <div class="canvas-box"><canvas id="volumeChart"></canvas></div>
+      </div>
+      <div class="glass panel tilt-card">
+        <h2>异动信号榜</h2>
+        <p class="caption">按综合分数提取最值得盯盘的高流动性标的。</p>
+        <div id="signalList" class="signal-list"></div>
+      </div>
+    </section>
+
+    <section class="grid">
+      <div class="glass panel tilt-card">
+        <h2>资金费率 vs 涨跌幅</h2>
+        <p class="caption">右上区域一般意味着价格强、资金费也高，注意拥挤交易。</p>
+        <div class="canvas-box short"><canvas id="fundingChart"></canvas></div>
+      </div>
+      <div class="glass panel tilt-card">
+        <h2>未平仓量 vs 涨跌幅</h2>
+        <p class="caption">上涨同时 OI 走高，更接近增量资金进场的趋势确认。</p>
+        <div class="canvas-box short"><canvas id="oiChart"></canvas></div>
+      </div>
+    </section>
+
+    <section class="glass kline-panel tilt-card">
+      <div class="kline-toolbar">
+        <h2 style="margin:0;">选中标的 4h K 线</h2>
+        <select id="klineInterval">
+          <option value="1h">1h</option>
+          <option value="4h" selected>4h</option>
+          <option value="1d">1d</option>
+        </select>
+        <div class="chip">Symbol: <strong id="selectedSymbol">-</strong></div>
+        <div class="chip">Last: <strong id="selectedPrice">-</strong></div>
+        <div class="chip">24h: <strong id="selectedChange">-</strong></div>
+        <div class="chip">Funding: <strong id="selectedFunding">-</strong></div>
+      </div>
+      <p class="caption">下方为简化版 K 线视图：蜡烛实体 + 上下影线。点击柱状图、散点图、信号榜都可以联动。</p>
+      <div class="canvas-box"><canvas id="klineChart"></canvas></div>
+    </section>
+
+    <div class="footer">
+      数据来自 Binance U本位合约公开接口。若浏览器对 file:// 请求有限制，请改用本地静态服务器打开。
+    </div>
+  </div>
+
+  <script>
+    const API_BASE = 'https://fapi.binance.com';
+    let volumeChart = null;
+    let fundingChart = null;
+    let oiChart = null;
+    let klineChart = null;
+    let refreshTimer = null;
+    let currentRows = [];
+    let selectedSymbol = null;
+    let selectedMeta = null;
+
+    function n(v) {
+      const x = Number(v);
+      return Number.isFinite(x) ? x : 0;
+    }
+
+    function fmtMoney(v) {
+      const x = n(v);
+      if (Math.abs(x) >= 1e9) return (x / 1e9).toFixed(2) + 'B';
+      if (Math.abs(x) >= 1e6) return (x / 1e6).toFixed(2) + 'M';
+      if (Math.abs(x) >= 1e3) return (x / 1e3).toFixed(2) + 'K';
+      return x.toFixed(2);
+    }
+
+    function fmtPct(v, digits = 2) {
+      return `${n(v).toFixed(digits)}%`;
+    }
+
+    function fmtPrice(v) {
+      const x = n(v);
+      if (x >= 1000) return x.toFixed(2);
+      if (x >= 1) return x.toFixed(4);
+      return x.toFixed(6);
+    }
+
+    function colorByScore(score) {
+      if (score >= 78) return 'rgba(34, 197, 94, 0.88)';
+      if (score >= 58) return 'rgba(56, 189, 248, 0.86)';
+      if (score >= 42) return 'rgba(245, 158, 11, 0.86)';
+      return 'rgba(139, 92, 246, 0.84)';
+    }
+
+    async function fetchJson(url) {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`请求失败: ${res.status} ${res.statusText}`);
+      return res.json();
+    }
+
+    function normalize(value, min, max) {
+      if (max === min) return 50;
+      return ((value - min) / (max - min)) * 100;
+    }
+
+    function classify(row) {
+      const fundingPct = row.fundingRate * 100;
+      if (row.priceChangePercent > 3 && row.oiScore > 55 && fundingPct < 0.04) return '强趋势';
+      if (row.priceChangePercent > 4 && fundingPct >= 0.04) return '过热预警';
+      if (Math.abs(row.priceChangePercent) > 5 && row.oiScore < 35) return '逼仓波动';
+      if (row.priceChangePercent < -3 && row.oiScore > 55) return '下跌强化';
+      return '观察中';
+    }
+
+    function signalColor(tag) {
+      if (tag === '强趋势') return '#22c55e';
+      if (tag === '过热预警') return '#f59e0b';
+      if (tag === '逼仓波动') return '#8b5cf6';
+      if (tag === '下跌强化') return '#ef4444';
+      return '#38bdf8';
+    }
+
+    function destroyCharts() {
+      [volumeChart, fundingChart, oiChart, klineChart].forEach(c => c && c.destroy());
+    }
+
+    const bar3dPlugin = {
+      id: 'bar3dPlugin',
+      afterDatasetsDraw(chart) {
+        if (chart.config.type !== 'bar') return;
+        const { ctx } = chart;
+        const meta = chart.getDatasetMeta(0);
+        ctx.save();
+        meta.data.forEach((bar, index) => {
+          const value = chart.data.datasets[0].data[index];
+          if (!value) return;
+          const props = bar.getProps(['x','y','base','width'], true);
+          const left = props.x - props.width / 2;
+          const right = props.x + props.width / 2;
+          const top = props.y;
+          const base = props.base;
+          const dx = 10;
+          const dy = -8;
+
+          ctx.fillStyle = 'rgba(255,255,255,0.12)';
+          ctx.beginPath();
+          ctx.moveTo(left, top);
+          ctx.lineTo(right, top);
+          ctx.lineTo(right + dx, top + dy);
+          ctx.lineTo(left + dx, top + dy);
+          ctx.closePath();
+          ctx.fill();
+
+          ctx.fillStyle = 'rgba(0,0,0,0.22)';
+          ctx.beginPath();
+          ctx.moveTo(right, top);
+          ctx.lineTo(right, base);
+          ctx.lineTo(right + dx, base + dy);
+          ctx.lineTo(right + dx, top + dy);
+          ctx.closePath();
+          ctx.fill();
+        });
+        ctx.restore();
+      }
+    };
+
+    const candlePlugin = {
+      id: 'candlePlugin',
+      afterDraw(chart) {
+        if (chart.canvas.id !== 'klineChart') return;
+        const dataset = chart.data.datasets[0];
+        if (!dataset || !dataset.candles) return;
+        const { ctx, scales } = chart;
+        const xScale = scales.x;
+        const yScale = scales.y;
+        const candles = dataset.candles;
+        const width = Math.max(6, Math.min(16, chart.chartArea.width / Math.max(candles.length * 1.8, 24)));
+
+        ctx.save();
+        candles.forEach((candle, i) => {
+          const x = xScale.getPixelForValue(i);
+          const openY = yScale.getPixelForValue(candle.open);
+          const closeY = yScale.getPixelForValue(candle.close);
+          const highY = yScale.getPixelForValue(candle.high);
+          const lowY = yScale.getPixelForValue(candle.low);
+          const up = candle.close >= candle.open;
+          const color = up ? 'rgba(34,197,94,0.95)' : 'rgba(239,68,68,0.95)';
+          const glow = up ? 'rgba(34,197,94,0.22)' : 'rgba(239,68,68,0.22)';
+          const bodyTop = Math.min(openY, closeY);
+          const bodyBottom = Math.max(openY, closeY);
+          const bodyHeight = Math.max(2, bodyBottom - bodyTop);
+
+          ctx.strokeStyle = color;
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(x, highY);
+          ctx.lineTo(x, lowY);
+          ctx.stroke();
+
+          ctx.fillStyle = color;
+          ctx.shadowColor = glow;
+          ctx.shadowBlur = 12;
+          ctx.fillRect(x - width / 2, bodyTop, width, bodyHeight);
+          ctx.shadowBlur = 0;
+        });
+        ctx.restore();
+      }
+    };
+
+    async function loadData() {
+      const statusEl = document.getElementById('status');
+      const topN = Number(document.getElementById('topN').value);
+      statusEl.textContent = '正在加载合约数据并计算信号...';
+      try {
+        const [exchangeInfo, tickers, premiumIndex] = await Promise.all([
+          fetchJson(`${API_BASE}/fapi/v1/exchangeInfo`),
+          fetchJson(`${API_BASE}/fapi/v1/ticker/24hr`),
+          fetchJson(`${API_BASE}/fapi/v1/premiumIndex`)
+        ]);
+
+        const perpUsdt = exchangeInfo.symbols.filter(s =>
+          s.quoteAsset === 'USDT' && s.contractType === 'PERPETUAL' && s.status === 'TRADING'
+        );
+
+        const tickersMap = new Map(tickers.map(x => [x.symbol, x]));
+        const premiumMap = new Map(premiumIndex.map(x => [x.symbol, x]));
+
+        const topByVolume = perpUsdt.map(s => {
+          const t = tickersMap.get(s.symbol) || {};
+          const p = premiumMap.get(s.symbol) || {};
+          return {
+            symbol: s.symbol,
+            quoteVolume: n(t.quoteVolume),
+            volume: n(t.volume),
+            lastPrice: n(t.lastPrice),
+            priceChangePercent: n(t.priceChangePercent),
+            fundingRate: n(p.lastFundingRate),
+            markPrice: n(p.markPrice),
+            nextFundingTime: n(p.nextFundingTime)
+          };
+        }).sort((a, b) => b.quoteVolume - a.quoteVolume).slice(0, topN);
+
+        const oiResults = await Promise.all(topByVolume.map(async row => {
+          try {
+            const oi = await fetchJson(`${API_BASE}/fapi/v1/openInterest?symbol=${row.symbol}`);
+            return { ...row, openInterest: n(oi.openInterest) };
+          } catch {
+            return { ...row, openInterest: 0 };
+          }
+        }));
+
+        const maxVol = Math.max(...oiResults.map(x => x.quoteVolume), 1);
+        const minVol = Math.min(...oiResults.map(x => x.quoteVolume), 0);
+        const maxAbsChange = Math.max(...oiResults.map(x => Math.abs(x.priceChangePercent)), 1);
+        const maxFunding = Math.max(...oiResults.map(x => Math.abs(x.fundingRate * 100)), 0.0001);
+        const maxOi = Math.max(...oiResults.map(x => x.openInterest), 1);
+        const minOi = Math.min(...oiResults.map(x => x.openInterest), 0);
+
+        currentRows = oiResults.map(row => {
+          const volumeScore = normalize(row.quoteVolume, minVol, maxVol);
+          const moveScore = (Math.abs(row.priceChangePercent) / maxAbsChange) * 100;
+          const fundingScore = (Math.abs(row.fundingRate * 100) / maxFunding) * 100;
+          const oiScore = normalize(row.openInterest, minOi, maxOi);
+          const score = volumeScore * 0.35 + moveScore * 0.25 + fundingScore * 0.15 + oiScore * 0.25;
+          return {
+            ...row,
+            volumeScore,
+            moveScore,
+            fundingScore,
+            oiScore,
+            score,
+            signal: classify({ ...row, oiScore })
+          };
+        }).sort((a, b) => b.quoteVolume - a.quoteVolume);
+
+        renderCards(perpUsdt.length, currentRows);
+        renderSignals([...currentRows].sort((a, b) => b.score - a.score).slice(0, 8));
+        renderCharts(currentRows);
+
+        if (!selectedSymbol || !currentRows.find(x => x.symbol === selectedSymbol)) {
+          selectedSymbol = currentRows[0]?.symbol || null;
+        }
+        const meta = currentRows.find(x => x.symbol === selectedSymbol) || currentRows[0] || null;
+        if (meta) await selectSymbol(meta.symbol, false);
+
+        statusEl.textContent = `加载成功：已分析 ${currentRows.length} 个高流动性 USDT 永续合约`;
+      } catch (err) {
+        console.error(err);
+        statusEl.textContent = `加载失败：${err.message}`;
+      }
+    }
+
+    function renderCards(totalSymbols, rows) {
+      const leader = rows[0] || null;
+      const overheat = [...rows].sort((a, b) => ((b.fundingRate * 100) + b.priceChangePercent) - ((a.fundingRate * 100) + a.priceChangePercent))[0] || null;
+      document.getElementById('totalSymbols').textContent = totalSymbols;
+      document.getElementById('visualCount').textContent = rows.length;
+      document.getElementById('topSymbol').textContent = leader ? leader.symbol : '-';
+      document.getElementById('topSymbolNote').textContent = leader ? `成交额 ${fmtMoney(leader.quoteVolume)} · 涨跌 ${fmtPct(leader.priceChangePercent)}` : '-';
+      document.getElementById('overheatSymbol').textContent = overheat ? overheat.symbol : '-';
+      document.getElementById('overheatNote').textContent = overheat ? `资金费 ${fmtPct(overheat.fundingRate * 100, 4)} · 涨跌 ${fmtPct(overheat.priceChangePercent)}` : '-';
+    }
+
+    function renderSignals(rows) {
+      const container = document.getElementById('signalList');
+      container.innerHTML = rows.map(row => {
+        const color = signalColor(row.signal);
+        return `
+          <div class="signal-item" data-symbol="${row.symbol}">
+            <div class="signal-badge" style="color:${color}; background:${color};"></div>
+            <div>
+              <div class="signal-title">${row.symbol}</div>
+              <div class="signal-meta">成交额 ${fmtMoney(row.quoteVolume)} ｜ 涨跌 ${fmtPct(row.priceChangePercent)} ｜ 资金费 ${fmtPct(row.fundingRate * 100, 4)} ｜ OI ${fmtMoney(row.openInterest)}</div>
+            </div>
+            <div class="signal-tag">${row.signal}</div>
+          </div>
+        `;
+      }).join('');
+
+      container.querySelectorAll('.signal-item').forEach(item => {
+        item.addEventListener('click', () => selectSymbol(item.dataset.symbol));
+      });
+    }
+
+    function renderCharts(rows) {
+      if (volumeChart) volumeChart.destroy();
+      if (fundingChart) fundingChart.destroy();
+      if (oiChart) oiChart.destroy();
+
+      const labels = rows.map(x => x.symbol);
+      const volumeColors = rows.map(x => colorByScore(x.score));
+
+      volumeChart = new Chart(document.getElementById('volumeChart'), {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [{
+            data: rows.map(x => x.quoteVolume),
+            backgroundColor: volumeColors,
+            borderRadius: 10,
+            borderSkipped: false
+          }]
+        },
+        plugins: [bar3dPlugin],
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          onClick: (_, elements) => {
+            if (!elements.length) return;
+            const row = rows[elements[0].index];
+            if (row) selectSymbol(row.symbol);
+          },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => {
+                  const row = rows[ctx.dataIndex];
+                  return `成交额 ${fmtMoney(row.quoteVolume)} ｜ 涨跌 ${fmtPct(row.priceChangePercent)} ｜ 分数 ${row.score.toFixed(1)}`;
+                }
+              }
+            }
+          },
+          scales: {
+            x: {
+              grid: { color: 'rgba(255,255,255,.05)' },
+              ticks: { color: '#c9d6ee', maxRotation: 56, minRotation: 56 }
+            },
+            y: {
+              grid: { color: 'rgba(255,255,255,.05)' },
+              ticks: { color: '#c9d6ee', callback: v => fmtMoney(v) }
+            }
+          }
+        }
+      });
+
+      fundingChart = new Chart(document.getElementById('fundingChart'), {
+        type: 'scatter',
+        data: {
+          datasets: [{
+            data: rows.map(x => ({ x: x.priceChangePercent, y: x.fundingRate * 100, symbol: x.symbol, quoteVolume: x.quoteVolume })),
+            pointRadius: rows.map(x => Math.max(6, Math.min(18, x.score / 6))),
+            pointHoverRadius: rows.map(x => Math.max(8, Math.min(22, x.score / 5))),
+            backgroundColor: rows.map(x => colorByScore(x.score)),
+            borderColor: 'rgba(255,255,255,.65)',
+            borderWidth: 1
+          }]
+        },
+        options: {
+          parsing: false,
+          responsive: true,
+          maintainAspectRatio: false,
+          onClick: (_, elements) => {
+            if (!elements.length) return;
+            const row = rows[elements[0].index];
+            if (row) selectSymbol(row.symbol);
+          },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => {
+                  const p = ctx.raw;
+                  return `${p.symbol} ｜ 涨跌 ${fmtPct(p.x)} ｜ 资金费 ${fmtPct(p.y, 4)} ｜ 成交额 ${fmtMoney(p.quoteVolume)}`;
+                }
+              }
+            }
+          },
+          scales: {
+            x: {
+              title: { display: true, text: '24h 涨跌幅 %', color: '#c9d6ee' },
+              grid: { color: 'rgba(255,255,255,.05)' },
+              ticks: { color: '#c9d6ee', callback: v => `${v}%` }
+            },
+            y: {
+              title: { display: true, text: '资金费率 %', color: '#c9d6ee' },
+              grid: { color: 'rgba(255,255,255,.05)' },
+              ticks: { color: '#c9d6ee', callback: v => `${v}%` }
+            }
+          }
+        }
+      });
+
+      oiChart = new Chart(document.getElementById('oiChart'), {
+        type: 'scatter',
+        data: {
+          datasets: [{
+            data: rows.map(x => ({ x: x.priceChangePercent, y: x.openInterest, symbol: x.symbol, fundingRate: x.fundingRate })),
+            pointRadius: rows.map(x => Math.max(6, Math.min(18, x.score / 6))),
+            pointHoverRadius: rows.map(x => Math.max(8, Math.min(22, x.score / 5))),
+            backgroundColor: rows.map(x => colorByScore(x.score)),
+            borderColor: 'rgba(255,255,255,.6)',
+            borderWidth: 1
+          }]
+        },
+        options: {
+          parsing: false,
+          responsive: true,
+          maintainAspectRatio: false,
+          onClick: (_, elements) => {
+            if (!elements.length) return;
+            const row = rows[elements[0].index];
+            if (row) selectSymbol(row.symbol);
+          },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => {
+                  const p = ctx.raw;
+                  return `${p.symbol} ｜ 涨跌 ${fmtPct(p.x)} ｜ OI ${fmtMoney(p.y)} ｜ 资金费 ${fmtPct(p.fundingRate * 100, 4)}`;
+                }
+              }
+            }
+          },
+          scales: {
+            x: {
+              title: { display: true, text: '24h 涨跌幅 %', color: '#c9d6ee' },
+              grid: { color: 'rgba(255,255,255,.05)' },
+              ticks: { color: '#c9d6ee', callback: v => `${v}%` }
+            },
+            y: {
+              title: { display: true, text: 'Open Interest', color: '#c9d6ee' },
+              grid: { color: 'rgba(255,255,255,.05)' },
+              ticks: { color: '#c9d6ee', callback: v => fmtMoney(v) }
+            }
+          }
+        }
+      });
+    }
+
+    async function selectSymbol(symbol, updateChartsFocus = true) {
+      selectedSymbol = symbol;
+      selectedMeta = currentRows.find(x => x.symbol === symbol) || null;
+      if (!selectedMeta) return;
+
+      document.getElementById('focusSymbol').textContent = selectedMeta.symbol;
+      document.getElementById('focusNote').textContent = `成交额 ${fmtMoney(selectedMeta.quoteVolume)} · ${selectedMeta.signal}`;
+      document.getElementById('selectedSymbol').textContent = selectedMeta.symbol;
+      document.getElementById('selectedPrice').textContent = fmtPrice(selectedMeta.lastPrice || selectedMeta.markPrice);
+      document.getElementById('selectedChange').textContent = fmtPct(selectedMeta.priceChangePercent);
+      document.getElementById('selectedFunding').textContent = fmtPct(selectedMeta.fundingRate * 100, 4);
+
+      await loadKline(selectedMeta.symbol, document.getElementById('klineInterval').value);
+
+      if (updateChartsFocus) {
+        document.querySelectorAll('.signal-item').forEach(item => {
+          item.style.borderColor = item.dataset.symbol === symbol ? 'rgba(56,189,248,.35)' : 'rgba(255,255,255,.06)';
+          item.style.background = item.dataset.symbol === symbol ? 'rgba(11, 23, 43, 0.64)' : 'rgba(2, 6, 23, 0.36)';
+        });
+      }
+    }
+
+    async function loadKline(symbol, interval) {
+      const klines = await fetchJson(`${API_BASE}/fapi/v1/klines?symbol=${symbol}&interval=${interval}&limit=42`);
+      const candles = klines.map(k => ({
+        time: k[0],
+        open: n(k[1]),
+        high: n(k[2]),
+        low: n(k[3]),
+        close: n(k[4])
+      }));
+
+      const labels = candles.map(c => {
+        const d = new Date(c.time);
+        return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:00`;
+      });
+      const prices = candles.map(c => c.close);
+
+      if (klineChart) klineChart.destroy();
+      klineChart = new Chart(document.getElementById('klineChart'), {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [{
+            data: prices,
+            borderColor: 'rgba(125, 211, 252, 0.25)',
+            pointRadius: 0,
+            tension: 0.25,
+            fill: false,
+            candles
+          }]
+        },
+        plugins: [candlePlugin],
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => {
+                  const c = candles[ctx.dataIndex];
+                  return `O ${fmtPrice(c.open)} H ${fmtPrice(c.high)} L ${fmtPrice(c.low)} C ${fmtPrice(c.close)}`;
+                }
+              }
+            }
+          },
+          scales: {
+            x: {
+              grid: { color: 'rgba(255,255,255,.05)' },
+              ticks: { color: '#c9d6ee', maxTicksLimit: 8 }
+            },
+            y: {
+              grid: { color: 'rgba(255,255,255,.05)' },
+              ticks: { color: '#c9d6ee', callback: v => fmtPrice(v) }
+            }
+          }
+        }
+      });
+    }
+
+    function resetTimer() {
+      if (refreshTimer) clearInterval(refreshTimer);
+      const ms = Number(document.getElementById('refreshInterval').value);
+      if (ms > 0) refreshTimer = setInterval(loadData, ms);
+    }
+
+    function initTilt() {
+      const cards = document.querySelectorAll('.tilt-card');
+      cards.forEach(card => {
+        card.addEventListener('mousemove', e => {
+          const rect = card.getBoundingClientRect();
+          const px = (e.clientX - rect.left) / rect.width;
+          const py = (e.clientY - rect.top) / rect.height;
+          const rx = (0.5 - py) * 8;
+          const ry = (px - 0.5) * 10;
+          card.style.transform = `rotateX(${rx}deg) rotateY(${ry}deg) translateZ(0)`;
+        });
+        card.addEventListener('mouseleave', () => {
+          card.style.transform = 'rotateX(0deg) rotateY(0deg)';
+        });
+      });
+    }
+
+    document.getElementById('refreshBtn').addEventListener('click', loadData);
+    document.getElementById('topN').addEventListener('change', loadData);
+    document.getElementById('refreshInterval').addEventListener('change', () => {
+      resetTimer();
+      loadData();
+    });
+    document.getElementById('klineInterval').addEventListener('change', () => {
+      if (selectedSymbol) loadKline(selectedSymbol, document.getElementById('klineInterval').value);
+    });
+
+    initTilt();
+    resetTimer();
+    loadData();
+  </script>
+</body>
+</html>
+
